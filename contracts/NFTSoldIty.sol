@@ -3,23 +3,40 @@ pragma solidity 0.8.18;
 
 import "erc721a/contracts/ERC721A.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
-contract NFTSoldIty is ERC721A, Ownable {
+error NFTSoldIty__NotEnoughETH();
+error NFTSoldIty__TransferFailed();
+error NFTSoldIty__AddressIsNotHighestBidder();
+
+contract NFTSoldIty is ERC721A, Ownable, ReentrancyGuard {
     // Structs
 
     struct Auction {
         uint256 s_tokenIdToBid;
+        address s_tokenIdToBidder;
         string s_tokenIdToTokenURI;
         uint256 s_tokenIdToAuctionStart;
         uint256 s_tokenIdToAuctionDuration;
     }
-    // Mappings
+
+    // NFT Variables
+    uint256 constant minBid = 0.01 ether;
+    uint256 constant startPrice = 0.1 ether;
+
+    // NFT Mappings
     mapping(uint256 => Auction) private auctions;
+    mapping(address => uint256) private pendingReturns;
 
     // Events
     event NFT_Minted(address indexed minter, uint256 indexed tokenId);
     event NFT_SetTokenURI(string uri, uint256 indexed tokenId);
     event NFT_AuctionTimeUpdated(uint256 indexed time, uint256 indexed tokenId);
+    event NFT_PendingBidsWithdrawal(
+        uint256 indexed bid,
+        address indexed bidder,
+        bool indexed transfer
+    );
 
     constructor() ERC721A("NFTSoldIty", "NFTSI") {}
 
@@ -28,7 +45,7 @@ contract NFTSoldIty is ERC721A, Ownable {
         external
         onlyOwner
     {
-        if (auctionDuration < 10) revert Abstract__AuctionDurationTooShort();
+        if (auctionDuration < 10) revert NFTSoldIty__AuctionDurationTooShort();
 
         uint256 newTokenId = totalSupply();
         Auction storage auction = auctions[newTokenId];
@@ -45,12 +62,41 @@ contract NFTSoldIty is ERC721A, Ownable {
         emit NFT_AuctionTimeUpdated(auctionDuration, newTokenId);
     }
 
-    function tokenURI(uint256 tokenURI) public returns (string memory) {
-        Auction storage auctions = auctions[tokenId];
+    function tokenURI(uint256 tokenId)
+        public
+        view
+        override
+        returns (string memory)
+    {
+        Auction storage auction = auctions[tokenId];
         return auction.s_tokenIdToTokenURI;
     }
 
-    function approve() public {}
+    function approve() public payable {
+        Auction storage auction = auctions[tokenId];
+        if (to != auction.s_tokenIdToBidder)
+            revert NFTSoldIty__AddressIsNotHighestBidder();
+
+        super.approve(to, tokenId);
+    }
+
+    function withdrawRejected() external payable nonReentrant {
+        uint256 amount = rejectedFunds[msg.sender];
+
+        if (amount > 0) {
+            rejectedFunds[msg.sender] = 0;
+        } else {
+            revert NFTSoldIty__NotEnoughETH();
+        }
+
+        (bool success, ) = msg.sender.call{value: amount}("");
+        if (!success) {
+            rejectedFunds[msg.sender] = amount;
+            revert NFTSoldIty__TransferFailed();
+        }
+
+        emit NFT_PendingBidingWithdrawal(amount, msg.sender, success);
+    }
 
     function withdrawMoney() private onlyOwner {}
 
@@ -64,5 +110,5 @@ contract NFTSoldIty is ERC721A, Ownable {
 
     function getTime() external {}
 
-    function getPendingReturns() external {}
+    function getrejectedFunds() external {}
 }
