@@ -18,24 +18,17 @@ contract NFTSoldIty is ERC721A, Ownable {
 
     constructor() ERC721A("NFTSoldIty", "NFTSI") {}
 
-    /**
-     * @dev Functions list private, public and external
-     */
-
+    // Contract functions
     function mintNFT(string memory externalTokenURI, uint256 auctionDuration)
         external
         onlyOwner
-    {
-        uint256 newTokenId = totalSupply();
-        Auction storage auction = auctions[newTokenId];
+    {}
 
-        auction.s_tokenIdToTokenURI = externalTokenURI;
-        auction.s_tokenIdToAuctionDuration = auctionDuration;
-
-        emit NFT_Minted(msg.sender, newTokenId);
-    }
-
-    function tokenURI() public {}
+    function tokenURI(uint256 tokenId)
+        override
+        publicview
+        returns (string memory)
+    {}
 
     function approve() public {}
 
