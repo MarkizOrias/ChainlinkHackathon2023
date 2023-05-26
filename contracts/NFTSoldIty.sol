@@ -72,30 +72,35 @@ contract NFTSoldIty is ERC721A, Ownable, ReentrancyGuard {
         return auction.s_tokenIdToTokenURI;
     }
 
-    function approve() public payable {
+    function approve(address to, uint256 tokenId)
+        public
+        payable
+        override
+        biddingStateCheck(tokenId)
+    {
         Auction storage auction = auctions[tokenId];
         if (to != auction.s_tokenIdToBidder)
-            revert NFTSoldIty__AddressIsNotHighestBidder();
+            revert Abstract__AddressIsNotHighestBidder();
 
         super.approve(to, tokenId);
     }
 
-    function withdrawRejected() external payable nonReentrant {
-        uint256 amount = rejectedFunds[msg.sender];
+    function withdrawPending() external payable nonReentrant {
+        uint256 amount = pendingReturns[msg.sender];
 
         if (amount > 0) {
-            rejectedFunds[msg.sender] = 0;
+            pendingReturns[msg.sender] = 0;
         } else {
-            revert NFTSoldIty__NotEnoughETH();
+            revert Abstract__NotEnoughETH();
         }
 
         (bool success, ) = msg.sender.call{value: amount}("");
         if (!success) {
-            rejectedFunds[msg.sender] = amount;
-            revert NFTSoldIty__TransferFailed();
+            pendingReturns[msg.sender] = amount;
+            revert Abstract__TransferFailed();
         }
 
-        emit NFT_PendingBidingWithdrawal(amount, msg.sender, success);
+        emit NFT_PendingBidsWithdrawal(amount, msg.sender, success);
     }
 
     function withdrawMoney() private onlyOwner {}
