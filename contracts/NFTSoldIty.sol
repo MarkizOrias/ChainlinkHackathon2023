@@ -45,11 +45,10 @@ contract NFTSoldIty is ERC721A, Ownable {
         emit NFT_AuctionTimeUpdated(auctionDuration, newTokenId);
     }
 
-    function tokenURI(uint256 tokenId)
-        override
-        publicview
-        returns (string memory)
-    {}
+    function tokenURI(uint256 tokenURI) public returns (string memory) {
+        Auction storage auctions = auctions[tokenId];
+        return auction.s_tokenIdToTokenURI;
+    }
 
     function approve() public {}
 
