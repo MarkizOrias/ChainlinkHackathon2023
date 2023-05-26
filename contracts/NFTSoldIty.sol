@@ -8,6 +8,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 error NFTSoldIty__NotEnoughETH();
 error NFTSoldIty__TransferFailed();
 error NFTSoldIty__AddressIsNotHighestBidder();
+error NFTSoldIty__AuctionStillOpenForThisNFT();
 
 contract NFTSoldIty is ERC721A, Ownable, ReentrancyGuard {
     // Structs
@@ -80,7 +81,7 @@ contract NFTSoldIty is ERC721A, Ownable, ReentrancyGuard {
     {
         Auction storage auction = auctions[tokenId];
         if (to != auction.s_tokenIdToBidder)
-            revert Abstract__AddressIsNotHighestBidder();
+            revert NFTSoldIty__AddressIsNotHighestBidder();
 
         super.approve(to, tokenId);
     }
@@ -91,13 +92,13 @@ contract NFTSoldIty is ERC721A, Ownable, ReentrancyGuard {
         if (amount > 0) {
             pendingReturns[msg.sender] = 0;
         } else {
-            revert Abstract__NotEnoughETH();
+            revert NFTSoldIty__NotEnoughETH();
         }
 
         (bool success, ) = msg.sender.call{value: amount}("");
         if (!success) {
             pendingReturns[msg.sender] = amount;
-            revert Abstract__TransferFailed();
+            revert NFTSoldIty__TransferFailed();
         }
 
         emit NFT_PendingBidsWithdrawal(amount, msg.sender, success);
@@ -105,7 +106,36 @@ contract NFTSoldIty is ERC721A, Ownable, ReentrancyGuard {
 
     function withdrawMoney() private onlyOwner {}
 
-    function renewAuction() external {}
+    function renewAuction(uint256 tokenId)
+        external
+        onlyOwner
+        biddingStateCheck(tokenId)
+    {
+        Auction storage auction = auctions[tokenId];
+        if (!_exists(tokenId)) revert NFTSoldIty__NotExistingTokenId();
+        if (auction.s_tokenIdToBidder != address(0))
+            revert NFTSoldIty__BidReceivedForThisNFT();
+
+        auction.s_tokenIdToAuctionStart = block.timestamp;
+
+        emit NFT_AuctionTimeUpdated(
+            (auction.s_tokenIdToAuctionStart +
+                auction.s_tokenIdToAuctionDuration -
+                block.timestamp),
+            tokenId
+        );
+    }
+
+    modifier biddingStateCheck(uint256 tokenId) {
+        Auction storage auction = auctions[tokenId];
+        if (
+            (auction.s_tokenIdToAuctionStart +
+                auction.s_tokenIdToAuctionDuration) > block.timestamp
+        ) {
+            revert NFTSoldIty__AuctionStillOpenForThisNFT();
+        }
+        _;
+    }
 
     modifier biddingStateCheck() {}
 
