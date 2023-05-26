@@ -7,12 +7,18 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 error NFTSoldIty__NotEnoughETH();
 error NFTSoldIty__TransferFailed();
+error NFTSoldIty__FunctionDisabled();
+error NFTSoldIty__NotExistingTokenId();
+error NFTSoldIty__BidReceivedForThisNFT();
+error NFTSoldIty__AuctionDurationTooShort();
+error NFTSoldIty__NoBidReceivedForThisNFT();
 error NFTSoldIty__AddressIsNotHighestBidder();
+error NFTSoldIty__AuctionFinishedForThisNFT();
 error NFTSoldIty__AuctionStillOpenForThisNFT();
+error NFTSoldIty__ContractOwnerIsNotAllowedToBid();
 
 contract NFTSoldIty is ERC721A, Ownable, ReentrancyGuard {
-    // Structs
-
+    // NFT Structs
     struct Auction {
         uint256 s_tokenIdToBid;
         address s_tokenIdToBidder;
@@ -29,19 +35,33 @@ contract NFTSoldIty is ERC721A, Ownable, ReentrancyGuard {
     mapping(uint256 => Auction) private auctions;
     mapping(address => uint256) private pendingReturns;
 
-    // Events
-    event NFT_Minted(address indexed minter, uint256 indexed tokenId);
+    // NFT Events
+    event NFT_BidAccepted(uint256 indexed tokenId);
     event NFT_SetTokenURI(string uri, uint256 indexed tokenId);
+    event NFT_Minted(address indexed minter, uint256 indexed tokenId);
     event NFT_AuctionTimeUpdated(uint256 indexed time, uint256 indexed tokenId);
+    event NFT_AddedPendingBidsForWithdrawal(
+        uint256 indexed bid,
+        address indexed bidder
+    );
+    event NFT_BidPlaced(
+        uint256 indexed amount,
+        address indexed bidder,
+        uint256 indexed tokenId
+    );
+    event NFT_WithdrawCompleted(
+        uint256 indexed amount,
+        bool indexed transfer,
+        uint256 indexed tokenId
+    );
     event NFT_PendingBidsWithdrawal(
         uint256 indexed bid,
         address indexed bidder,
         bool indexed transfer
     );
 
-    constructor() ERC721A("NFTSoldIty", "NFTSI") {}
+    constructor() ERC721A("NFTSoldIty Impulse", "AIN") {}
 
-    // Contract functions
     function mintNFT(string memory externalTokenURI, uint256 auctionDuration)
         external
         onlyOwner
@@ -61,6 +81,67 @@ contract NFTSoldIty is ERC721A, Ownable, ReentrancyGuard {
         emit NFT_Minted(msg.sender, newTokenId);
         emit NFT_SetTokenURI(auction.s_tokenIdToTokenURI, newTokenId);
         emit NFT_AuctionTimeUpdated(auctionDuration, newTokenId);
+    }
+
+    /** @dev Consider BuyOut Option Too */
+    function placeBid(uint256 tokenId) external payable nonReentrant {
+        Auction storage auction = auctions[tokenId];
+        // Make sure the contract owner cannot bid
+        if (msg.sender == owner())
+            revert NFTSoldIty__ContractOwnerIsNotAllowedToBid();
+
+        // Check if NFT exists
+        if (!_exists(tokenId)) revert NFTSoldIty__NotExistingTokenId();
+
+        // Check if the auction is still ongoing
+        if (
+            (auction.s_tokenIdToAuctionStart +
+                auction.s_tokenIdToAuctionDuration) < block.timestamp
+        ) {
+            revert NFTSoldIty__AuctionFinishedForThisNFT();
+        }
+
+        // Extend the auction by 5 minutes if it's close to ending
+        if (
+            (auction.s_tokenIdToAuctionStart +
+                auction.s_tokenIdToAuctionDuration -
+                block.timestamp) < 2 minutes
+        ) {
+            auction.s_tokenIdToAuctionStart += 2 minutes;
+            emit NFT_AuctionTimeUpdated(
+                auction.s_tokenIdToAuctionStart +
+                    auction.s_tokenIdToAuctionDuration -
+                    block.timestamp,
+                tokenId
+            );
+        }
+
+        // If there were no previous bids
+        if (auction.s_tokenIdToBidder == address(0)) {
+            // Check if the bid amount is high enough
+            if (msg.value < startPrice) revert NFTSoldIty__NotEnoughETH();
+        }
+        // If there were previous bids
+        else {
+            // Check if the bid amount is high enough
+            if (msg.value < (auction.s_tokenIdToBid + minBid))
+                revert NFTSoldIty__NotEnoughETH();
+
+            pendingReturns[auction.s_tokenIdToBidder] += auction.s_tokenIdToBid;
+            emit NFT_AddedPendingBidsForWithdrawal(
+                pendingReturns[auction.s_tokenIdToBidder],
+                auction.s_tokenIdToBidder
+            );
+        }
+
+        // Update the bid and bidder
+        auction.s_tokenIdToBid = msg.value;
+        auction.s_tokenIdToBidder = payable(msg.sender);
+        emit NFT_BidPlaced(
+            auction.s_tokenIdToBid,
+            auction.s_tokenIdToBidder,
+            tokenId
+        );
     }
 
     function tokenURI(uint256 tokenId)
@@ -86,6 +167,24 @@ contract NFTSoldIty is ERC721A, Ownable, ReentrancyGuard {
         super.approve(to, tokenId);
     }
 
+    /**
+     * @dev This will occur once timer end or if owner decide to accept bid, so js script has to trigger it, but there is onlyOwner approval needed
+     */
+    function acceptBid(uint256 tokenId)
+        external
+        onlyOwner
+        biddingStateCheck(tokenId)
+    {
+        Auction storage auction = auctions[tokenId];
+        if (!_exists(tokenId)) revert NFTSoldIty__NotExistingTokenId();
+        if (auction.s_tokenIdToBidder == address(0))
+            revert NFTSoldIty__NoBidReceivedForThisNFT();
+
+        withdrawMoney(tokenId);
+        approve(auction.s_tokenIdToBidder, tokenId);
+        emit NFT_BidAccepted(tokenId);
+    }
+
     function withdrawPending() external payable nonReentrant {
         uint256 amount = pendingReturns[msg.sender];
 
@@ -104,7 +203,18 @@ contract NFTSoldIty is ERC721A, Ownable, ReentrancyGuard {
         emit NFT_PendingBidsWithdrawal(amount, msg.sender, success);
     }
 
-    function withdrawMoney() private onlyOwner {}
+    /**
+     * @dev We are able to withdraw money from contract only for closed biddings
+     * If we leave it as "private" we should remove all "if" and modifiers as acceptBid is checking those
+     */
+    function withdrawMoney(uint256 tokenId) private onlyOwner {
+        Auction storage auction = auctions[tokenId];
+
+        (bool success, ) = msg.sender.call{value: auction.s_tokenIdToBid}("");
+        if (!success) revert NFTSoldIty__TransferFailed();
+
+        emit NFT_WithdrawCompleted(auction.s_tokenIdToBid, success, tokenId);
+    }
 
     function renewAuction(uint256 tokenId)
         external
@@ -137,13 +247,28 @@ contract NFTSoldIty is ERC721A, Ownable, ReentrancyGuard {
         _;
     }
 
-    modifier biddingStateCheck() {}
+    function getHighestBidder(uint256 tokenId) external view returns (address) {
+        Auction storage auction = auctions[tokenId];
+        return auction.s_tokenIdToBidder;
+    }
 
-    function getHighestBidder() external {}
+    function getHighestBid(uint256 tokenId) external view returns (uint256) {
+        Auction storage auction = auctions[tokenId];
+        return auction.s_tokenIdToBid;
+    }
 
-    function getHighestBid() external {}
+    function getTime(uint256 tokenId) external view returns (uint256) {
+        Auction storage auction = auctions[tokenId];
+        return
+            ((auction.s_tokenIdToAuctionStart +
+                auction.s_tokenIdToAuctionDuration) < block.timestamp)
+                ? 0
+                : (auction.s_tokenIdToAuctionStart +
+                    auction.s_tokenIdToAuctionDuration -
+                    block.timestamp);
+    }
 
-    function getTime() external {}
-
-    function getrejectedFunds() external {}
+    function getPendingReturns(address bidder) external view returns (uint256) {
+        return pendingReturns[bidder];
+    }
 }
