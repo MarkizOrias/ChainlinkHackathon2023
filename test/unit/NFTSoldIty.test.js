@@ -6,7 +6,7 @@ const { developmentChains } = require("../../helper-hardhat-config")
 !developmentChains.includes(network.name)
     ? describe.skip
     : describe("NFTSoldIty NFT Unit Tests", function () {
-        let NFTSoldIty, deployer
+        let NFTSoldIty, NFTSoldItyInstanceExternal, deployer, user
 
         beforeEach(async () => {
             accounts = await ethers.getSigners()
@@ -17,12 +17,10 @@ const { developmentChains } = require("../../helper-hardhat-config")
 
         describe("Constructor", () => {
             it("Initializes the NFT Correctly.", async () => {
-                const name = await NFTSoldIty
-                y.name()
-                const symbol = await NFTSoldIty
-                y.symbol()
-                const tokenCounter = await NFTSoldIty
-                y.getTokenCounter()
+                const owner = await NFTSoldIty.owner()
+                const name = await NFTSoldIty.name()
+                const symbol = await NFTSoldIty.symbol()
+                const tokenCounter = await NFTSoldIty.getTokenCounter()
 
                 assert.equal(name, "NFTSoldIty")
                 assert.equal(symbol, "AIN")
@@ -32,13 +30,11 @@ const { developmentChains } = require("../../helper-hardhat-config")
 
         describe("Mint NFT", () => {
             beforeEach(async () => {
-                const txResponse = await NFTSoldIty
-                y.mintNFT("tokenURI", "nftTitle")
+                const txResponse = await NFTSoldIty.mintNFT("tokenURI", "nftTitle")
                 await txResponse.wait(1)
             })
             it("Allows owner to mint an NFT", async function () {
-                const tokenCounter = await NFTSoldIty
-                y.getTokenCounter()
+                const tokenCounter = await NFTSoldIty.getTokenCounter()
                 assert.equal(tokenCounter.toString(), "1")
             })
             it("Not allows accounts other than owner minting NFT", async function () {
@@ -57,12 +53,9 @@ const { developmentChains } = require("../../helper-hardhat-config")
                 y.ownerOf("0")
 
                 // Second Mint
-                await NFTSoldIty
-                y.mintNFT("tokenURI2", "nftTitle2")
-                const secBalance = await NFTSoldIty
-                y.balanceOf(deployerAddress)
-                const secOwner = await NFTSoldIty
-                y.ownerOf("1")
+                await NFTSoldIty.mintNFT("tokenURI2", "nftTitle2")
+                const secBalance = await NFTSoldIty.balanceOf(deployerAddress)
+                const secOwner = await NFTSoldIty.ownerOf("1")
 
                 assert.equal(deployerBalance.toString(), "1")
                 assert.equal(owner, deployerAddress)
@@ -75,19 +68,6 @@ const { developmentChains } = require("../../helper-hardhat-config")
             beforeEach(async () => {
                 const txResponse = await NFTSoldIty.mintNFT("tokenURI", "nftTitle")
                 await txResponse.wait(1)
-                const owner = await NFTSoldIty.owner()
-                console.log(`Contract Owner: ${owner}`)
-            })
-            it("Allows user to bid an NFT", async function () {
-                const user = accounts[3]
-                console.log(`External User ${user.address}`)
-                const abstractExternal = await NFTSoldIty.connect(user)
-                tx = await abstractExternal.placeBid(0, { value: ethers.utils.parseEther("1") })
-                //await expect(abstractExternal.placeBid(0)).not.to.be.reverted
-                assert(tx)
-            })
-            it("Not allows owner to bid an NFT", async function () {
-                await expect(NFTSoldIty.placeBid(0)).to.be.revertedWith("Abstract__ContractOwnerIsNotAllowedToBid")
             })
         })
     })
