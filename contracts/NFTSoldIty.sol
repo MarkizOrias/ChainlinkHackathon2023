@@ -167,6 +167,51 @@ contract NFTSoldIty is ERC721A, Ownable, ReentrancyGuard {
         super.approve(to, tokenId);
     }
 
+    function transferFrom(
+        address from,
+        address to,
+        uint256 tokenId
+    ) public payable override biddingStateCheck(tokenId) {
+        Auction storage auction = auctions[tokenId];
+        if (to != auction.s_tokenIdToBidder)
+            revert NFTSoldIty__AddressIsNotHighestBidder();
+
+        super.transferFrom(from, to, tokenId);
+    }
+
+    function safeTransferFrom(
+        address from,
+        address to,
+        uint256 tokenId
+    ) public payable override biddingStateCheck(tokenId) {
+        Auction storage auction = auctions[tokenId];
+        if (to != auction.s_tokenIdToBidder)
+            revert NFTSoldIty__AddressIsNotHighestBidder();
+
+        super.safeTransferFrom(from, to, tokenId);
+    }
+
+    function safeTransferFrom(
+        address from,
+        address to,
+        uint256 tokenId,
+        bytes memory _data
+    ) public payable override biddingStateCheck(tokenId) {
+        Auction storage auction = auctions[tokenId];
+        if (to != auction.s_tokenIdToBidder)
+            revert NFTSoldIty__AddressIsNotHighestBidder();
+
+        super.safeTransferFrom(from, to, tokenId, _data);
+    }
+
+    // Function disabled!
+    function setApprovalForAll(
+        address, /*operator*/
+        bool /*approved*/
+    ) public pure override {
+        revert NFTSoldIty__FunctionDisabled();
+    }
+
     /**
      * @dev This will occur once timer end or if owner decide to accept bid, so js script has to trigger it, but there is onlyOwner approval needed
      */
