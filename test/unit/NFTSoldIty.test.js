@@ -12,7 +12,7 @@ const { developmentChains, AUCTION_DURATION } = require("../../helper-hardhat-co
             auctionDuration = 30
             accounts = await ethers.getSigners()
             deployer = accounts[0]
-            // Deploying nftSoldIty
+            // Deploying NFTSoldIty
             await deployments.fixture(["NFTSoldIty"])
             nftSoldIty = await ethers.getContract("NFTSoldIty")
         })
@@ -69,11 +69,8 @@ const { developmentChains, AUCTION_DURATION } = require("../../helper-hardhat-co
              * It renew and sets correct auction time for given tokenId and emit's (time, tokenId) ✔️
           10. getters()
              * It displays correct data ✔️
-
-          * @dev To be removed once done!
-
           */
-        // ----------------------------------------------------------------------------------------------------------------------------------------------------------------
+        // --------------------------------------------------------------------------------------------------------------------------
         describe("Constructor", () => {
             it("Initializes the NFT Correctly.", async () => {
                 const owner = await nftSoldIty.owner()
@@ -87,7 +84,7 @@ const { developmentChains, AUCTION_DURATION } = require("../../helper-hardhat-co
                 assert.equal(tokenCounter.toString(), "0")
             })
         })
-        // ----------------------------------------------------------------------------------------------------------------------------------------------------------------
+        // --------------------------------------------------------------------------------------------------------------------------
         describe("Mint NFT", () => {
             beforeEach(async () => {
                 // Minting NFT
@@ -149,7 +146,7 @@ const { developmentChains, AUCTION_DURATION } = require("../../helper-hardhat-co
                 await expect(nftSoldItyInstance.mintNFT("tokenURIxx", auctionDuration)).to.be.revertedWith("Ownable: caller is not the owner")
             })
         })
-        // ----------------------------------------------------------------------------------------------------------------------------------------------------------------
+        // --------------------------------------------------------------------------------------------------------------------------
         describe("Place Bid", () => {
             beforeEach(async () => {
                 // Minting NFT
@@ -283,7 +280,6 @@ const { developmentChains, AUCTION_DURATION } = require("../../helper-hardhat-co
                 await expect(respTx).to.emit(nftSoldIty, `NFT_PendingBidsWithdrawal`)
             })
         })
-        // ----------------------------------------------------------------------------------------------------------------------------------------------------------------
         describe("Withdraw Pending", () => {
             beforeEach(async () => {
                 user = accounts[3]
@@ -342,7 +338,6 @@ const { developmentChains, AUCTION_DURATION } = require("../../helper-hardhat-co
                 assert.equal(finalUserBalance, startingUserBalance.sub(gasCost).sub(newGasCost).sub(newestGasCost).toString())
             })
         })
-        // ----------------------------------------------------------------------------------------------------------------------------------------------------------------
         describe("Save And Read TokenURI", () => {
             it("It returns correct tokenURI per tokenId", async () => {
                 await nftSoldIty.mintNFT("FirstTokenURI", auctionDuration)
@@ -354,7 +349,6 @@ const { developmentChains, AUCTION_DURATION } = require("../../helper-hardhat-co
                 assert.equal(tokenURI, "SecondTokenURI")
             })
         })
-        // ----------------------------------------------------------------------------------------------------------------------------------------------------------------
         describe("Functions allowed to use: approve(), transferFrom(), safeTransferFrom(), safeTransferFrom()", () => {
             beforeEach(async () => {
                 user = accounts[3]
@@ -396,7 +390,6 @@ const { developmentChains, AUCTION_DURATION } = require("../../helper-hardhat-co
                 ).to.emit(nftSoldIty, "Transfer")
             })
         })
-        // ----------------------------------------------------------------------------------------------------------------------------------------------------------------
         describe("Functions not allowed to be used by owner for lower bidder", () => {
             beforeEach(async () => {
                 user = accounts[3]
@@ -424,7 +417,6 @@ const { developmentChains, AUCTION_DURATION } = require("../../helper-hardhat-co
                 )
             })
         })
-        // ----------------------------------------------------------------------------------------------------------------------------------------------------------------
         describe("Functions not allowed to use: approve(), transferFrom(), safeTransferFrom(), safeTransferFrom()", () => {
             beforeEach(async () => {
                 user = accounts[3]
@@ -458,7 +450,6 @@ const { developmentChains, AUCTION_DURATION } = require("../../helper-hardhat-co
                 ).to.be.revertedWith("NFTSoldIty__AuctionStillOpenForThisNFT")
             })
         })
-        // ----------------------------------------------------------------------------------------------------------------------------------------------------------------
         describe("Set Approval For All Function", () => {
             it("It reverts once used", async () => {
                 user = accounts[4]
@@ -467,7 +458,6 @@ const { developmentChains, AUCTION_DURATION } = require("../../helper-hardhat-co
                 await expect(nftSoldIty.setApprovalForAll(user.address, true)).to.be.revertedWith("NFTSoldIty__FunctionDisabled")
             })
         })
-        // ----------------------------------------------------------------------------------------------------------------------------------------------------------------
         describe("Accept Bid", () => {
             beforeEach(async () => {
                 tokenId = 0
@@ -584,7 +574,6 @@ const { developmentChains, AUCTION_DURATION } = require("../../helper-hardhat-co
                 assert.equal(ownerBalance.toString(), startingOwnerBalance.add(firstBid).add(secondBid).sub(gasCost).sub(newGasCost).toString())
             })
         })
-        // ----------------------------------------------------------------------------------------------------------------------------------------------------------------
         describe("Renew Auction", () => {
             beforeEach(async () => {
                 tokenId = 0
@@ -631,7 +620,6 @@ const { developmentChains, AUCTION_DURATION } = require("../../helper-hardhat-co
                 await expect(nftSoldIty.renewAuction(tokenId)).to.be.revertedWith("NFTSoldIty__BidReceivedForThisNFT")
             })
         })
-        // ----------------------------------------------------------------------------------------------------------------------------------------------------------------
         describe("Getters", () => {
             beforeEach(async () => {
                 tokenId = 0
