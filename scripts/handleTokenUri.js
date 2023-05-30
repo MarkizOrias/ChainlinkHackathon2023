@@ -19,7 +19,7 @@ async function handleTokenUris() {
         }
 
         storeUris.push(`https://ipfs.io/ipfs/${imageUploadResponses[imageUploadResponseIndex].IpfsHash.toString()}` + "\n")
-        fs.writeFileSync(uploadedImagesURIs, storeUris.toString().replace(",", ""))
+        fs.writeFileSync(uploadedImagesURIs, storeUris.toString().replace(/,/g, ""))
     }
 
     // Clearing Array...
@@ -33,7 +33,7 @@ async function handleTokenUris() {
 
         // Editing Metadata
         tokenUriMetadata.name = files[imageUploadResponseIndex].replace(".jpg", "")
-        tokenUriMetadata.description = `Unique ${tokenUriMetadata.name} art`
+        tokenUriMetadata.description = `Unique ${tokenUriMetadata.name} hand painted piece of art`
         tokenUriMetadata.image = `https://ipfs.io/ipfs/${imageUploadResponses[imageUploadResponseIndex].IpfsHash}`
         console.log(`Uploading ${tokenUriMetadata.name} metadata...`)
 
@@ -47,7 +47,7 @@ async function handleTokenUris() {
             console.log("Saving Metadata URIs To File...")
         }
         storeUris.push(`https://ipfs.io/ipfs/${metadataUploadResponse.IpfsHash.toString()}` + "\n")
-        fs.writeFileSync(uploadedMetadataURIs, storeUris.toString().replace(",", ""))
+        fs.writeFileSync(uploadedMetadataURIs, storeUris.toString().replace(/,/g, ""))
     }
     console.log("Token URIs uploaded! They are:")
     console.log(tokenUris)

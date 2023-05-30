@@ -79,7 +79,7 @@ const { developmentChains, AUCTION_DURATION } = require("../../helper-hardhat-co
                 const tokenCounter = await nftSoldIty.totalSupply()
 
                 assert.equal(owner, deployer.address)
-                assert.equal(name, "NFTSoldIty Impulse")
+                assert.equal(name, "NFTSoldIty")
                 assert.equal(symbol, "AIN")
                 assert.equal(tokenCounter.toString(), "0")
             })
