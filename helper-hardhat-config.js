@@ -21,8 +21,8 @@ const DECIMALS = "18"
 const INITIAL_PRICE = "200000000000000000000"
 const AUCTION_DURATION = 30
 
-const uploadedImagesURIs = "../CHAINLINKHACKATHON2023/utils/uploadedURIs/uploadedImagesURIs.txt"
-const uploadedMetadataURIs = "../CHAINLINKHACKATHON2023/utils/uploadedURIs/uploadedMetadataURIs.txt"
+const uploadedImagesURIs = "../ChainlinkHackathon2023/utils/uploadedURIs/uploadedImagesURIs.txt"
+const uploadedMetadataURIs = "../ChainlinkHackathon2023/utils/uploadedURIs/uploadedMetadataURIs.txt"
 
 module.exports = {
     networkConfig,
