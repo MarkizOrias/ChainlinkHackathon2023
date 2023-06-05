@@ -382,7 +382,7 @@ contract NFTSoldIty is
         address, /*operator*/
         bool /*approved*/
     ) public pure override {
-        revert Abstract__FunctionDisabled();
+        revert NFTSoldIty__FunctionDisabled();
     }
 
     function getHighestBidder(uint256 tokenId) external view returns (address) {
