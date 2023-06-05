@@ -4,6 +4,7 @@ pragma solidity 0.8.18;
 import "erc721a/contracts/ERC721A.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@chainlink/contracts/src/v0.8/interfaces/AutomationCompatibleInterface.sol";
 
 error NFTSoldIty__NotEnoughETH();
 error NFTSoldIty__TransferFailed();
@@ -17,7 +18,12 @@ error NFTSoldIty__AuctionFinishedForThisNFT();
 error NFTSoldIty__AuctionStillOpenForThisNFT();
 error NFTSoldIty__ContractOwnerIsNotAllowedToBid();
 
-contract NFTSoldIty is ERC721A, Ownable, ReentrancyGuard {
+contract NFTSoldIty is
+    ERC721A,
+    Ownable,
+    ReentrancyGuard,
+    AutomationCompatibleInterface
+{
     // NFT Structs
     struct Auction {
         uint256 s_tokenIdToBid;
@@ -30,6 +36,9 @@ contract NFTSoldIty is ERC721A, Ownable, ReentrancyGuard {
     // NFT Variables
     uint256 constant minBid = 0.01 ether;
     uint256 constant startPrice = 0.1 ether;
+    uint256 private immutable i_interval;
+    uint256 private s_lastTimeStamp;
+    address public v_chainlinkKeeper;
 
     // NFT Mappings
     mapping(uint256 => Auction) private auctions;
@@ -60,7 +69,13 @@ contract NFTSoldIty is ERC721A, Ownable, ReentrancyGuard {
         bool indexed transfer
     );
 
-    constructor() ERC721A("NFTSoldIty Impulse", "AIN") {}
+    constructor(uint256 interval, address chainlinkKeeper)
+        ERC721A("NFTSoldIty", "NSI")
+    {
+        i_interval = interval;
+        s_lastTimeStamp = block.timestamp;
+        v_chainlinkKeeper = chainlinkKeeper;
+    }
 
     function mintNFT(string memory externalTokenURI, uint256 auctionDuration)
         external
@@ -77,6 +92,8 @@ contract NFTSoldIty is ERC721A, Ownable, ReentrancyGuard {
         auction.s_tokenIdToTokenURI = externalTokenURI;
         auction.s_tokenIdToAuctionStart = block.timestamp;
         auction.s_tokenIdToAuctionDuration = auctionDuration;
+
+        // setApprovalForAll(v_chainlinkKeeper, true);
 
         emit NFT_Minted(msg.sender, newTokenId);
         emit NFT_SetTokenURI(auction.s_tokenIdToTokenURI, newTokenId);
@@ -204,20 +221,12 @@ contract NFTSoldIty is ERC721A, Ownable, ReentrancyGuard {
         super.safeTransferFrom(from, to, tokenId, _data);
     }
 
-    // Function disabled!
-    function setApprovalForAll(
-        address, /*operator*/
-        bool /*approved*/
-    ) public pure override {
-        revert NFTSoldIty__FunctionDisabled();
-    }
-
     /**
      * @dev This will occur once timer end or if owner decide to accept bid, so js script has to trigger it, but there is onlyOwner approval needed
      */
     function acceptBid(uint256 tokenId)
-        external
-        onlyOwner
+        public
+        onlyChainlinkKeeper
         biddingStateCheck(tokenId)
     {
         Auction storage auction = auctions[tokenId];
@@ -252,10 +261,10 @@ contract NFTSoldIty is ERC721A, Ownable, ReentrancyGuard {
      * @dev We are able to withdraw money from contract only for closed biddings
      * If we leave it as "private" we should remove all "if" and modifiers as acceptBid is checking those
      */
-    function withdrawMoney(uint256 tokenId) private onlyOwner {
+    function withdrawMoney(uint256 tokenId) private onlyChainlinkKeeper {
         Auction storage auction = auctions[tokenId];
 
-        (bool success, ) = msg.sender.call{value: auction.s_tokenIdToBid}("");
+        (bool success, ) = owner().call{value: auction.s_tokenIdToBid}("");
         if (!success) revert NFTSoldIty__TransferFailed();
 
         emit NFT_WithdrawCompleted(auction.s_tokenIdToBid, success, tokenId);
@@ -290,6 +299,81 @@ contract NFTSoldIty is ERC721A, Ownable, ReentrancyGuard {
             revert NFTSoldIty__AuctionStillOpenForThisNFT();
         }
         _;
+    }
+
+    modifier onlyChainlinkKeeper() {
+        require(
+            msg.sender == v_chainlinkKeeper,
+            "Sender is not chainlinkKeeper!"
+        );
+        _;
+    }
+
+    function checkUpkeep(
+        bytes memory /* checkData */
+    )
+        public
+        view
+        override
+        returns (
+            bool upkeepNeeded,
+            bytes memory /* performData */
+        )
+    {
+        uint256 numberOfNFTs = totalSupply(); //works!
+        bool timePassed = ((block.timestamp - s_lastTimeStamp) > i_interval);
+
+        for (uint256 i = 0; i < numberOfNFTs; i++) {
+            Auction storage auction = auctions[i];
+
+            bool auctionIsEnded = (auction.s_tokenIdToAuctionStart +
+                auction.s_tokenIdToAuctionDuration) < block.timestamp;
+            bool bidIsReceived = auction.s_tokenIdToBidder != address(0);
+            bool ownerIsContractOwner = owner() == ownerOf(i);
+            bool newOwnerIsApproved = getApproved(i) == address(0);
+
+            if (
+                auctionIsEnded &&
+                bidIsReceived &&
+                ownerIsContractOwner &&
+                newOwnerIsApproved &&
+                timePassed
+            ) {
+                upkeepNeeded = true;
+            }
+        }
+
+        return (upkeepNeeded, "0x0");
+    }
+
+    function performUpkeep(
+        bytes calldata /* performData */
+    ) external override {
+        uint256 numberOfNFTs = totalSupply();
+        bool timePassed = ((block.timestamp - s_lastTimeStamp) > i_interval);
+
+        for (uint256 i = 0; i < numberOfNFTs; i++) {
+            Auction storage auction = auctions[i];
+
+            bool auctionIsEnded = (auction.s_tokenIdToAuctionStart +
+                auction.s_tokenIdToAuctionDuration) < block.timestamp;
+            bool bidIsReceived = auction.s_tokenIdToBidder != address(0);
+            bool ownerIsContractOwner = owner() == ownerOf(i);
+            bool newOwnerIsApproved = getApproved(i) == address(0);
+
+            if (
+                auctionIsEnded &&
+                bidIsReceived &&
+                ownerIsContractOwner &&
+                newOwnerIsApproved &&
+                timePassed
+            ) {
+                s_lastTimeStamp = block.timestamp;
+                acceptBid(i);
+            }
+        }
+
+        // We don't use the performData in this example. The performData is generated by the Automation Node's call to your checkUpkeep function
     }
 
     function getHighestBidder(uint256 tokenId) external view returns (address) {
