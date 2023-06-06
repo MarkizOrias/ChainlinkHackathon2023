@@ -1,13 +1,13 @@
 const { network } = require("hardhat")
 const { verify } = require("../utils/verify")
-const { developmentChains } = require("../helper-hardhat-config")
+const { developmentChains, INTERVAL, CHAINLINK_KEEPER } = require("../helper-hardhat-config")
 
 module.exports = async ({ getNamedAccounts, deployments }) => {
     const { deploy, log } = deployments
     const { deployer } = await getNamedAccounts()
 
     log("----------------------------------------------------")
-    arguments = []
+    arguments = [INTERVAL, CHAINLINK_KEEPER]
     const nftSoldIty = await deploy("NFTSoldIty", {
         from: deployer,
         args: arguments,

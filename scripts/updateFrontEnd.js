@@ -1,7 +1,7 @@
 const { ethers } = require("hardhat")
 const { developmentChains, motherContract } = require("../helper-hardhat-config")
-const frontEndContractsFile = "../no-patrick-code/constants/networkMapping.json"
-const frontEndAbiLocation = "../no-patrick-code/constants/"
+const frontEndContractsFile = "../chainlink-hackathon-2023-fe/constants/networkMapping.json"
+const frontEndAbiLocation = "../chainlink-hackathon-2023-fe/constants/"
 const fs = require("fs")
 
 async function updateFrontEnd() {
